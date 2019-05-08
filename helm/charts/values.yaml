@@ -1,0 +1,42 @@
+extraEnv: {}
+extraArgs:
+  base-role-arn: arn:aws:iam::<account-id-here>:role/
+  remove-iptables-on-exit: true
+
+host:
+  ip: $(HOST_IP)
+  iptables: true
+  interface: eni+
+  port: 8181
+
+prometheus:
+  serviceMonitor:
+    enabled: false
+    interval: 10s
+    namespace: ""
+
+image:
+  repository: savvythru/kube2iam
+  tag: dev
+  pullPolicy: IfNotPresent
+
+aws:
+  secret_key: ""
+  access_key: ""
+  region: ""
+
+nodeSelector: {}
+affinity: {}
+podAnnotations: {}
+priorityClassName: ""
+podLabels: {}
+probe: true
+
+rbac:
+  create: true
+  serviceAccountName: default
+
+resources: {}
+updateStrategy: OnDelete
+verbose: false
+tolerations: [{"key": "kube2iam", "operator": "Exists", "effect": "NoSchedule"}]
