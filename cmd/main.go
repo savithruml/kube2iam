@@ -1,36 +1,36 @@
 package main
 
 import (
+	"os"
+	"os/signal"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
+	"syscall"
 
 	"github.com/jtblin/kube2iam/iam"
 	"github.com/jtblin/kube2iam/iptables"
 	"github.com/jtblin/kube2iam/server"
 	"github.com/jtblin/kube2iam/version"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 )
 
 // addFlags adds the command line flags.
 func addFlags(s *server.Server, fs *pflag.FlagSet) {
 	fs.StringVar(&s.APIServer, "api-server", s.APIServer, "Endpoint for the api server")
 	fs.StringVar(&s.APIToken, "api-token", s.APIToken, "Token to authenticate with the api server")
-	fs.StringVar(&s.AppPort, "app-port", s.AppPort, "Kube2iam server http port")
-	fs.StringVar(&s.MetricsPort, "metrics-port", s.MetricsPort, "Metrics server http port (default: same as kube2iam server port)")
+	fs.StringVar(&s.AppPort, "app-port", s.AppPort, "Http port")
 	fs.StringVar(&s.BaseRoleARN, "base-role-arn", s.BaseRoleARN, "Base role ARN")
 	fs.BoolVar(&s.Debug, "debug", s.Debug, "Enable debug features")
 	fs.StringVar(&s.DefaultIAMRole, "default-role", s.DefaultIAMRole, "Fallback role to use when annotation is not set")
 	fs.StringVar(&s.IAMRoleKey, "iam-role-key", s.IAMRoleKey, "Pod annotation key used to retrieve the IAM role")
-	fs.DurationVar(&s.IAMRoleSessionTTL, "iam-role-session-ttl", s.IAMRoleSessionTTL, "TTL for the assume role session")
 	fs.BoolVar(&s.Insecure, "insecure", false, "Kubernetes server should be accessed without verifying the TLS. Testing only")
 	fs.StringVar(&s.MetadataAddress, "metadata-addr", s.MetadataAddress, "Address for the ec2 metadata")
 	fs.BoolVar(&s.AddIPTablesRule, "iptables", false, "Add iptables rule (also requires --host-ip)")
+	fs.BoolVar(&s.RemoveIPTablesRuleOnExit, "remove-iptables-on-exit", false, "Attempt to remove iptables rule on exit (also requires --iptables)")
 	fs.BoolVar(&s.AutoDiscoverBaseArn, "auto-discover-base-arn", false, "Queries EC2 Metadata to determine the base ARN")
 	fs.BoolVar(&s.AutoDiscoverDefaultRole, "auto-discover-default-role", false, "Queries EC2 Metadata to determine the default Iam Role and base ARN, cannot be used with --default-role, overwrites any previous setting for --base-role-arn")
 	fs.StringVar(&s.HostInterface, "host-interface", "docker0", "Host interface for proxying AWS metadata")
 	fs.BoolVar(&s.NamespaceRestriction, "namespace-restrictions", false, "Enable namespace restrictions")
-	fs.StringVar(&s.NamespaceRestrictionFormat, "namespace-restriction-format", s.NamespaceRestrictionFormat, "Namespace Restriction Format (glob/regexp)")
 	fs.StringVar(&s.NamespaceKey, "namespace-key", s.NamespaceKey, "Namespace annotation key used to retrieve the IAM roles allowed (value in annotation should be json array)")
 	fs.StringVar(&s.HostIP, "host-ip", s.HostIP, "IP address of host")
 	fs.StringVar(&s.NodeName, "node", s.NodeName, "Name of the node where kube2iam is running")
@@ -38,7 +38,6 @@ func addFlags(s *server.Server, fs *pflag.FlagSet) {
 	fs.DurationVar(&s.BackoffMaxElapsedTime, "backoff-max-elapsed-time", s.BackoffMaxElapsedTime, "Max elapsed time for backoff when querying for role.")
 	fs.StringVar(&s.LogFormat, "log-format", s.LogFormat, "Log format (text/json)")
 	fs.StringVar(&s.LogLevel, "log-level", s.LogLevel, "Log level")
-	fs.BoolVar(&s.UseRegionalStsEndpoint, "use-regional-sts-endpoint", false, "use the regional sts endpoint if AWS_REGION is set")
 	fs.BoolVar(&s.Verbose, "verbose", false, "Verbose")
 	fs.BoolVar(&s.Version, "version", false, "Print the version and exits")
 }
@@ -109,9 +108,24 @@ func main() {
 		if err := iptables.AddRule(s.AppPort, s.MetadataAddress, s.HostInterface, s.HostIP); err != nil {
 			log.Fatalf("%s", err)
 		}
+	} else if s.RemoveIPTablesRuleOnExit {
+		log.Fatalf("You cannot use --remove-iptables-on-exit without also specifying --iptables")
 	}
 
-	if err := s.Run(s.APIServer, s.APIToken, s.NodeName, s.Insecure); err != nil {
-		log.Fatalf("%s", err)
+	signalChan := make(chan os.Signal)
+	go func() {
+		if err := s.Run(s.APIServer, s.APIToken, s.NodeName, s.Insecure); err != nil {
+			log.Errorf("%s", err)
+			signalChan <- syscall.SIGABRT // On error, just quit now by faking a signal
+		}
+	}()
+
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+
+	if s.RemoveIPTablesRuleOnExit {
+		if err := iptables.DeleteRule(s.AppPort, s.MetadataAddress, s.HostInterface, s.HostIP); err != nil {
+			log.Errorf("%s", err)
+		}
 	}
 }

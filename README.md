@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/jtblin/kube2iam.svg?branch=master)](https://travis-ci.org/jtblin/kube2iam)
 [![GitHub tag](https://img.shields.io/github/tag/jtblin/kube2iam.svg?maxAge=86400)](https://github.com/atlassian/gostatsd)
-[![Docker Pulls](https://img.shields.io/docker/pulls/jtblin/kube2iam.svg)](https://hub.docker.com/r/jtblin/kube2iam/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/jtblin/kube2iam.svg)]()
 [![Go Report Card](https://goreportcard.com/badge/github.com/jtblin/kube2iam)](https://goreportcard.com/report/github.com/jtblin/kube2iam)
 [![license](https://img.shields.io/github/license/jtblin/kube2iam.svg)](https://github.com/jtblin/kube2iam/blob/master/LICENSE)
 
@@ -84,16 +84,13 @@ The kube2iam daemon and iptables rule (see below) need to run before all other p
 access to AWS resources.
 
 ```yaml
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube2iam
   labels:
     app: kube2iam
 spec:
-  selector:
-    matchLabels:
-      name: kube2iam
   template:
     metadata:
       labels:
@@ -137,32 +134,24 @@ iptables \
 This rule can be added automatically by setting `--iptables=true`, setting the `HOST_IP` environment
 variable, and running the container in a privileged security context.
 
-**Warning**: It is possible that other pods are started on an instance before kube2iam has started. Using `--iptables=true` (instead of applying the rule before starting the kubelet) **could give those pods the opportunity to access the real EC2 metadata API, assume the role of the EC2 instance and thereby have all permissions the instance role has** (including assuming potential other roles). Use with care if you don't trust the users of your kubernetes cluster or if you are running pods (that could be exploited) that have permissions to create other pods (e.g. controllers / operators).
-
 Note that the interface `--in-interface` above or using the `--host-interface` cli flag may be
 different than `docker0` depending on which virtual network you use e.g.
 
-* for Calico, use `cali+` (the interface name is something like cali1234567890)
+* for Calico, use `cali+` (the interface name is something like cali1234567890
 * for kops (on kubenet), use `cbr0`
 * for CNI, use `cni0`
-* for [EKS](https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html)/[amazon-vpc-cni-k8s](https://github.com/aws/amazon-vpc-cni-k8s), even with calico installed uses `eni+`. (Each pod gets an interface like `eni4c0e15dfb05`)
 * for weave use `weave`
 * for flannel use `cni0`
 * for [kube-router](https://github.com/cloudnativelabs/kube-router) use `kube-bridge`
-* for [OpenShift](https://www.openshift.org/) use `tun0`
-* for [Cilium](https://www.cilium.io) use `lxc+`
 
 ```yaml
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube2iam
   labels:
     app: kube2iam
 spec:
-  selector:
-    matchLabels:
-      name: kube2iam
   template:
     metadata:
       labels:
@@ -222,13 +211,13 @@ You can use `--default-role` to set a fallback role to use when annotation is no
 
 #### ReplicaSet, CronJob, Deployment, etc.
 
-When creating higher-level abstractions than pods, you need to pass the annotation in the pod template of the
+When creating higher-level abstractions than pods, you need to pass the annotation in the pod template of the  
 resource spec.
 
 Example for a `Deployment`:
 
 ```yaml
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: nginx-deployment
@@ -251,7 +240,7 @@ spec:
 Example for a `CronJob`:
 
 ```yaml
-apiVersion: batch/v1
+apiVersion: batch/v2alpha1
 kind: CronJob
 metadata:
   name: my-cronjob
@@ -289,10 +278,10 @@ metadata:
   name: default
 ```
 
-_Note:_ You can also use glob-based matching for namespace restrictions, which works nicely with the path-based
-namespacing supported for AWS IAM roles.
+_Note:_ You can also use glob-based matching for namespace restrictions, which works nicely with the path-based 
+namespacing supported for AWS IAM roles. 
 
-Example: to allow all roles prefixed with `my-custom-path/` to be assumed by pods in the default namespace, the
+Example: to allow all roles prefixed with `my-custom-path/` to be assumed by pods in the default namespace, the 
 default namespace would be annotated as follows:
 
 ```yaml
@@ -302,19 +291,6 @@ metadata:
   annotations:
     iam.amazonaws.com/allowed-roles: |
       ["my-custom-path/*"]
-  name: default
-```
-
-If you prefer `regexp` to glob-based matching you can specify `--namespace-restriction-format=regexp`, then you can
-use a `regexp` in your annotation:
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  annotations:
-    iam.amazonaws.com/allowed-roles: |
-      ["my-custom-path/.*"]
   name: default
 ```
 
@@ -339,7 +315,7 @@ Next we need to setup roles and binding for the the process.
 ---
 apiVersion: v1
 items:
-  - apiVersion: rbac.authorization.k8s.io/v1
+  - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: ClusterRole
     metadata:
       name: kube2iam
@@ -347,7 +323,7 @@ items:
       - apiGroups: [""]
         resources: ["namespaces","pods"]
         verbs: ["get","watch","list"]
-  - apiVersion: rbac.authorization.k8s.io/v1
+  - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: ClusterRoleBinding
     metadata:
       name: kube2iam
@@ -368,7 +344,7 @@ Here is what a kube2iam daemonset yaml might look like.
 
 ```yaml
 ---
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube2iam
@@ -376,9 +352,6 @@ metadata:
   labels:
     app: kube2iam
 spec:
-  selector:
-    matchLabels:
-      name: kube2iam
   template:
     metadata:
       labels:
@@ -410,101 +383,6 @@ spec:
             privileged: true
 ```
 
-### Using on OpenShift
-
-To use `kube2iam` on OpenShift one needs to configure additional resources. A complete example looks like this:
-```yaml
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: kube2iam
-  namespace: kube-system
----
-apiVersion: v1
-items:
-  - apiVersion: rbac.authorization.k8s.io/v1beta1
-    kind: ClusterRole
-    metadata:
-      name: kube2iam
-    rules:
-      - apiGroups: [""]
-        resources: ["namespaces","pods"]
-        verbs: ["get","watch","list"]
-  - apiVersion: rbac.authorization.k8s.io/v1beta1
-    kind: ClusterRoleBinding
-    metadata:
-      name: kube2iam
-    subjects:
-    - kind: ServiceAccount
-      name: kube2iam
-      namespace: kube-system
-    roleRef:
-      kind: ClusterRole
-      name: kube2iam
-      apiGroup: rbac.authorization.k8s.io
-kind: List
----
-kind: SecurityContextConstraints
-apiVersion: v1
-metadata:
-  name: kube2iam
-allowPrivilegedContainer: true
-allowHostPorts: true
-allowHostNetwork: true
-runAsUser:
-  type: RunAsAny
-seLinuxContext:
-  type: MustRunAs
-users:
-- system:serviceacount:kube-system:kube2iam
----
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: kube2iam
-  namespace: kube-system
-  labels:
-    app: kube2iam
-spec:
-  selector:
-    matchLabels:
-      name: kube2iam
-  template:
-    metadata:
-      labels:
-        name: kube2iam
-    spec:
-      serviceAccountName: kube2iam
-      hostNetwork: true
-      nodeSelector:
-        role: app
-      containers:
-        - image: docker.io/jtblin/kube2iam:latest
-          imagePullPolicy: Always
-          name: kube2iam
-          args:
-            - "--app-port=8181"
-            - "--auto-discover-base-arn"
-            - "--iptables=true"
-            - "--host-ip=$(HOST_IP)"
-            - "--host-interface=tun0"
-            - "--verbose"
-          env:
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-          ports:
-            - containerPort: 8181
-              hostPort: 8181
-              name: http
-          securityContext:
-            privileged: true
-```
-
-**Note**: In (OpenShift) multi-tenancy setups it is recommended to restrict the assumable roles on the namespace level to prevent cross-namespace trust stealing.
-
 ### Debug
 
 By using the --debug flag you can enable some extra features making debugging easier:
@@ -520,23 +398,6 @@ By using the `--auto-discover-base-arn` flag, kube2iam will auto discover the ba
 By using the `--auto-discover-default-role` flag, kube2iam will auto discover the base ARN and the IAM role attached to
 the instance and use it as the fallback role to use when annotation is not set.
 
-### AWS STS Endpoint and Regions
-
-STS is a unique service in that it is actually considered a global service that defaults to endpoint at **https://sts.amazonaws.com**, regardless of your region setting. However, unlike other global services (e.g. CloudFront, IAM), STS also has regional endpoints which can only be explicitly used programatically. The use of a regional sts endpoint can reduce the latency for STS requests.
-
-`kube2iam` supports the use of STS regional endpoints by using the `--use-regional-sts-endpoint` flag as well as by setting the appropriate `AWS_REGION` environment variable in your daemonset environment. With these two settings configured, `kube2iam` will use the STS api endpoint for that region. If you enable debug level logging, the sts endpoint used to retrieve credentials will be logged.
-
-### Metrics
-
-`kube2iam` exports a number of [Prometheus](https://github.com/prometheus/prometheus) metrics to assist with monitoring
-the system's performance. By default, these are exported at the `/metrics` HTTP endpoint on the
-application server port (specified by `--app-port`). This does not always make sense, as anything with access to the
-application server port can assume roles via `kube2iam`. To mitigate this use the `--metrics-port` argument to specify
-a different port that will host the `/metrics` endpoint.
-
-All of the exported metrics are prefixed with `kube2iam_`. See the [Prometheus documentation](https://prometheus.io/docs/prometheus/latest/getting_started/)
-for more information on how to get up and running with Prometheus.
-
 ### Options
 
 By default, `kube2iam` will use the in-cluster method to connect to the kubernetes master, and use the
@@ -546,34 +407,30 @@ ARN in the annotation.
 
 ```bash
 $ kube2iam --help
-Usage of kube2iam:
-      --api-server string                     Endpoint for the api server
-      --api-token string                      Token to authenticate with the api server
-      --app-port string                       Kube2iam server http port (default "8181")
-      --auto-discover-base-arn                Queries EC2 Metadata to determine the base ARN
-      --auto-discover-default-role            Queries EC2 Metadata to determine the default Iam Role and base ARN, cannot be used with --default-role, overwrites any previous setting for --base-role-arn
-      --backoff-max-elapsed-time duration     Max elapsed time for backoff when querying for role. (default 2s)
-      --backoff-max-interval duration         Max interval for backoff when querying for role. (default 1s)
-      --base-role-arn string                  Base role ARN
-      --iam-role-session-ttl                  Length of session when assuming the roles (default 15m)
-      --debug                                 Enable debug features
-      --default-role string                   Fallback role to use when annotation is not set
-      --host-interface string                 Host interface for proxying AWS metadata (default "docker0")
-      --host-ip string                        IP address of host
-      --iam-role-key string                   Pod annotation key used to retrieve the IAM role (default "iam.amazonaws.com/role")
-      --insecure                              Kubernetes server should be accessed without verifying the TLS. Testing only
-      --iptables                              Add iptables rule (also requires --host-ip)
-      --log-format string                     Log format (text/json) (default "text")
-      --log-level string                      Log level (default "info")
-      --metadata-addr string                  Address for the ec2 metadata (default "169.254.169.254")
-      --metrics-port string                   Metrics server http port (default: same as kube2iam server port) (default "8181")
-      --namespace-key string                  Namespace annotation key used to retrieve the IAM roles allowed (value in annotation should be json array) (default "iam.amazonaws.com/allowed-roles")
-      --namespace-restriction-format string   Namespace Restriction Format (glob/regexp) (default "glob")
-      --namespace-restrictions                Enable namespace restrictions
-      --node string                           Name of the node where kube2iam is running
-      --use-regional-sts-endpoint             use the regional sts endpoint if AWS_REGION is set
-      --verbose                               Verbose
-      --version                               Print the version and exits
+Usage of ./build/bin/darwin/kube2iam:
+      --api-server string                   Endpoint for the api server
+      --api-token string                    Token to authenticate with the api server
+      --app-port string                     Http port (default "8181")
+      --auto-discover-base-arn              Queries EC2 Metadata to determine the base ARN
+      --auto-discover-default-role          Queries EC2 Metadata to determine the default Iam Role and base ARN, cannot be used with --default-role, overwrites any previous setting for --base-role-arn
+      --backoff-max-elapsed-time duration   Max elapsed time for backoff when querying for role. (default 2s)
+      --backoff-max-interval duration       Max interval for backoff when querying for role. (default 1s)
+      --base-role-arn string                Base role ARN
+      --debug                               Enable debug features
+      --default-role string                 Fallback role to use when annotation is not set
+      --host-interface string               Host interface for proxying AWS metadata (default "docker0")
+      --host-ip string                      IP address of host
+      --iam-role-key string                 Pod annotation key used to retrieve the IAM role (default "iam.amazonaws.com/role")
+      --insecure                            Kubernetes server should be accessed without verifying the TLS. Testing only
+      --iptables                            Add iptables rule (also requires --host-ip)
+      --remove-iptables-on-exit             Attempt to remove iptables rule on exit (also requires --iptables)
+      --log-format string                   Log format (text/json) (default "text")
+      --log-level string                    Log level (default "info")
+      --metadata-addr string                Address for the ec2 metadata (default "169.254.169.254")
+      --namespace-key string                Namespace annotation key used to retrieve the IAM roles allowed (value in annotation should be json array) (default "iam.amazonaws.com/allowed-roles")
+      --namespace-restrictions              Enable namespace restrictions
+      --verbose                             Verbose
+      --version                             Print the version and exits
 ```
 
 ## Development loop

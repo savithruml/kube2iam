@@ -1,4 +1,4 @@
-ORG_PATH="github.com/jtblin"
+ORG_PATH ?= "github.com/jtblin"
 BINARY_NAME := kube2iam
 REPO_PATH="$(ORG_PATH)/$(BINARY_NAME)"
 VERSION_VAR := $(REPO_PATH)/version.Version
@@ -27,10 +27,10 @@ setup:
 	glide install --strip-vendor
 
 build: *.go fmt
-	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) github.com/jtblin/$(BINARY_NAME)/cmd
+	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(ORG_PATH)/$(BINARY_NAME)/cmd
 
 build-race: *.go fmt
-	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) github.com/jtblin/$(BINARY_NAME)/cmd
+	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(ORG_PATH)/$(BINARY_NAME)/cmd
 
 build-all:
 	go build $$(glide nv)
@@ -67,7 +67,7 @@ check:
 	go install ./cmd
 
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=$(METALINTER_DEADLINE)s ./... --vendor --linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
-		--linter='vet:go vet --no-recurse -composites=false:PATH:LINE:MESSAGE' --disable=interfacer --dupl-threshold=50
+		--linter='vet:govet --no-recurse -composites=false:PATH:LINE:MESSAGE' --disable=interfacer --dupl-threshold=50
 
 check-all:
 	go install ./cmd
@@ -75,13 +75,11 @@ check-all:
 		--linter='vet:govet --no-recurse:PATH:LINE:MESSAGE' --dupl-threshold=50
 		--dupl-threshold=50
 
-travis-checks: build test-race check bench-race
-
 watch:
 	CompileDaemon -color=true -build "make test"
 
 cross:
-	CGO_ENABLED=0 GOOS=linux go build -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo  github.com/jtblin/$(BINARY_NAME)/cmd
+	CGO_ENABLED=0 GOOS=linux go build -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo  $(ORG_PATH)/$(BINARY_NAME)/cmd
 
 docker: cross
 	docker build -t $(IMAGE_NAME):$(GIT_HASH) . $(DOCKER_BUILD_FLAGS)
@@ -92,12 +90,10 @@ docker-dev: docker
 
 release: check test docker
 	docker push $(IMAGE_NAME):$(GIT_HASH)
-	docker tag $(IMAGE_NAME):$(GIT_HASH) $(IMAGE_NAME):$(REPO_VERSION)
-	docker push $(IMAGE_NAME):$(REPO_VERSION)
-ifeq (, $(findstring -rc, $(REPO_VERSION)))
 	docker tag $(IMAGE_NAME):$(GIT_HASH) $(IMAGE_NAME):latest
 	docker push $(IMAGE_NAME):latest
-endif
+	docker tag $(IMAGE_NAME):$(GIT_HASH) $(IMAGE_NAME):$(REPO_VERSION)
+	docker push $(IMAGE_NAME):$(REPO_VERSION)
 
 version:
 	@echo $(REPO_VERSION)
@@ -107,4 +103,4 @@ clean:
 	-docker rm $(docker ps -a -f 'status=exited' -q)
 	-docker rmi $(docker images -f 'dangling=true' -q)
 
-.PHONY: build version
+.PHONY: build
