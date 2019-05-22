@@ -15,11 +15,11 @@ import (
 
 	"github.com/cenk/backoff"
 	"github.com/gorilla/mux"
-	"github.com/jtblin/kube2iam"
-	"github.com/jtblin/kube2iam/iam"
-	"github.com/jtblin/kube2iam/k8s"
-	"github.com/jtblin/kube2iam/mappings"
-	"github.com/jtblin/kube2iam/metrics"
+	"github.com/savithruml/kube2iam"
+	"github.com/savithruml/kube2iam/iam"
+	"github.com/savithruml/kube2iam/k8s"
+	"github.com/savithruml/kube2iam/mappings"
+	"github.com/savithruml/kube2iam/metrics"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/cache"
 )

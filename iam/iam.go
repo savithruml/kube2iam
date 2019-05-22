@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/jtblin/kube2iam/metrics"
+	"github.com/savithruml/kube2iam/metrics"
 	"github.com/karlseguin/ccache"
 )
 

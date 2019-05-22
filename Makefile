@@ -1,4 +1,4 @@
-ORG_PATH ?= "github.com/jtblin"
+ORG_PATH ?= "github.com/savithruml"
 BINARY_NAME := kube2iam
 REPO_PATH="$(ORG_PATH)/$(BINARY_NAME)"
 VERSION_VAR := $(REPO_PATH)/version.Version
