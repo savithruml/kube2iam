@@ -27,7 +27,7 @@ setup:
 	glide install --strip-vendor
 
 build: *.go fmt
-	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(ORG_PATH)/$(BINARY_NAME)/cmd
+	env GOOS=linux GOARCH=386 go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(ORG_PATH)/$(BINARY_NAME)/cmd
 
 build-race: *.go fmt
 	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(ORG_PATH)/$(BINARY_NAME)/cmd
